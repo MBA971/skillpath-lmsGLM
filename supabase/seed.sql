@@ -209,12 +209,12 @@ INSERT INTO public.resources (id, competency_id, type, title, level, duration, r
 -- 10. DEVELOPMENT_PLAN_RESOURCES  (from assignedResources in CartographieView)
 -- ============================================================
 INSERT INTO public.development_plan_resources (id, profile_id, resource_id, competency_id) VALUES
-  ('dpr00000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'c03b0000-0000-0000-0000-000000000001'),
-  ('dpr00000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002', 'c03b0000-0000-0000-0000-000000000001'),
-  ('dpr00000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000005', 'c03b0000-0000-0000-0000-000000000002'),
-  ('dpr00000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000013', 'c03b0000-0000-0000-0000-000000000004'),
-  ('dpr00000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000015', 'c03b0000-0000-0000-0000-000000000004'),
-  ('dpr00000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000019', 'c03b0000-0000-0000-0000-000000000006');
+  ('d0b100000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000001', 'c03b0000-0000-0000-0000-000000000001'),
+  ('d0b100000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000002', 'c03b0000-0000-0000-0000-000000000001'),
+  ('d0b100000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000005', 'c03b0000-0000-0000-0000-000000000002'),
+  ('d0b100000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000013', 'c03b0000-0000-0000-0000-000000000004'),
+  ('d0b100000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000015', 'c03b0000-0000-0000-0000-000000000004'),
+  ('d0b100000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000019', 'c03b0000-0000-0000-0000-000000000006');
 
 -- ============================================================
 -- 11. QUIZZES  (3 from QuizView)
@@ -286,18 +286,18 @@ INSERT INTO public.quiz_attempts (id, profile_id, quiz_id, score, total_points, 
 -- ============================================================
 -- Thread: Sophie Laurent
 INSERT INTO public.messages (id, sender_id, recipient_id, thread_id, subject, body, is_read, created_at) VALUES
-  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000007', 't0000000-0000-0000-0000-000000000001', 'Slides session Leadership', 'Bonjour Marc, est-ce que vous pourriez partager les slides de la session de lundi avant vendredi ?', true, '2025-05-19T13:24:00Z'),
-  ('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000007', 'a0000000-0000-0000-0000-000000000001', 't0000000-0000-0000-0000-000000000001', 'Re: Slides session Leadership', 'Bien sûr Sophie ! Je vous envoie ça ce soir. Préparez aussi un cas réel de votre équipe pour l''exercice E4.', true, '2025-05-19T14:02:00Z'),
-  ('b0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000007', 't0000000-0000-0000-0000-000000000001', 'Re: Slides session Leadership', 'Parfait ! J''ai justement un projet de migration Agile en cours. Ce sera parfait comme étude de cas.', true, '2025-05-19T14:18:00Z');
+  ('b0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000007', 'd0000000-0000-0000-0000-000000000001', 'Slides session Leadership', 'Bonjour Marc, est-ce que vous pourriez partager les slides de la session de lundi avant vendredi ?', true, '2025-05-19T13:24:00Z'),
+  ('b0000000-0000-0000-0000-000000000002', 'a0000000-0000-0000-0000-000000000007', 'a0000000-0000-0000-0000-000000000001', 'd0000000-0000-0000-0000-000000000001', 'Re: Slides session Leadership', 'Bien sûr Sophie ! Je vous envoie ça ce soir. Préparez aussi un cas réel de votre équipe pour l''exercice E4.', true, '2025-05-19T14:02:00Z'),
+  ('b0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000001', 'a0000000-0000-0000-0000-000000000007', 'd0000000-0000-0000-0000-000000000001', 'Re: Slides session Leadership', 'Parfait ! J''ai justement un projet de migration Agile en cours. Ce sera parfait comme étude de cas.', true, '2025-05-19T14:18:00Z');
 
 -- Thread: Lucas Moreau
 INSERT INTO public.messages (id, sender_id, recipient_id, thread_id, subject, body, is_read, created_at) VALUES
-  ('b0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000007', 'a0000000-0000-0000-0000-000000000004', 't0000000-0000-0000-0000-000000000002', 'Prise de nouvelles', 'Bonjour Lucas, je voulais prendre de vos nouvelles. Vous êtes absent depuis 5 jours — tout va bien ?', false, '2025-05-15T09:00:00Z');
+  ('b0000000-0000-0000-0000-000000000004', 'a0000000-0000-0000-0000-000000000007', 'a0000000-0000-0000-0000-000000000004', 'd0000000-0000-0000-0000-000000000002', 'Prise de nouvelles', 'Bonjour Lucas, je voulais prendre de vos nouvelles. Vous êtes absent depuis 5 jours — tout va bien ?', false, '2025-05-15T09:00:00Z');
 
 -- Thread: Emma Petit
 INSERT INTO public.messages (id, sender_id, recipient_id, thread_id, subject, body, is_read, created_at) VALUES
-  ('b0000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000007', 't0000000-0000-0000-0000-000000000003', 'Session de la semaine', 'Super session la semaine dernière ! J''ai pu appliquer le daily standup avec mon équipe dès le lendemain.', true, '2025-05-13T11:05:00Z'),
-  ('b0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000007', 'a0000000-0000-0000-0000-000000000003', 't0000000-0000-0000-0000-000000000003', 'Re: Session de la semaine', 'C''est exactement ce qu''on cherche — bravo Emma ! Votre livrable E4 était également excellent.', true, '2025-05-13T11:32:00Z');
+  ('b0000000-0000-0000-0000-000000000005', 'a0000000-0000-0000-0000-000000000003', 'a0000000-0000-0000-0000-000000000007', 'd0000000-0000-0000-0000-000000000003', 'Session de la semaine', 'Super session la semaine dernière ! J''ai pu appliquer le daily standup avec mon équipe dès le lendemain.', true, '2025-05-13T11:05:00Z'),
+  ('b0000000-0000-0000-0000-000000000006', 'a0000000-0000-0000-0000-000000000007', 'a0000000-0000-0000-0000-000000000003', 'd0000000-0000-0000-0000-000000000003', 'Re: Session de la semaine', 'C''est exactement ce qu''on cherche — bravo Emma ! Votre livrable E4 était également excellent.', true, '2025-05-13T11:32:00Z');
 
 -- ============================================================
 -- 15. BADGES  (from DashboardView)
@@ -314,47 +314,47 @@ INSERT INTO public.badges (id, profile_id, type, label, earned_at) VALUES
 -- 16. PATH_PHASES  (5E from ParcoursView, for formation Management Agile)
 -- ============================================================
 INSERT INTO public.path_phases (id, formation_id, phase, title, description, sort_order, is_locked) VALUES
-  ('pp000000-0000-0000-0000-000000000001', 'f1000000-0000-0000-0000-000000000001', 'E1', 'Engager', 'Créer la motivation d''apprendre. Identifier ses pratiques de management actuelles et déceler ses zones d''inconfort.', 1, false),
-  ('pp000000-0000-0000-0000-000000000002', 'f1000000-0000-0000-0000-000000000001', 'E2', 'Explorer', 'Apprendre par l''expérimentation. Découvrir les principes Scrum et Kanban à travers des situations réelles d''entreprise.', 2, false),
-  ('pp000000-0000-0000-0000-000000000003', 'f1000000-0000-0000-0000-000000000001', 'E3', 'Expliquer', 'Structurer et conceptualiser. Maîtriser les frameworks Scrum, Kanban et SAFe dans leur dimension managériale.', 3, false),
-  ('pp000000-0000-0000-0000-000000000004', 'f1000000-0000-0000-0000-000000000001', 'E4', 'Élaborer', 'Transférer vers sa pratique. Concevoir et présenter un plan de transformation Agile pour votre propre équipe.', 4, true),
-  ('pp000000-0000-0000-0000-000000000005', 'f1000000-0000-0000-0000-000000000001', 'E5', 'Évaluer', 'Valider et certifier. Démontrer la maîtrise des compétences agiles et obtenir la validation de la formation.', 5, true);
+  ('ef000000-0000-0000-0000-000000000001', 'f1000000-0000-0000-0000-000000000001', 'E1', 'Engager', 'Créer la motivation d''apprendre. Identifier ses pratiques de management actuelles et déceler ses zones d''inconfort.', 1, false),
+  ('ef000000-0000-0000-0000-000000000002', 'f1000000-0000-0000-0000-000000000001', 'E2', 'Explorer', 'Apprendre par l''expérimentation. Découvrir les principes Scrum et Kanban à travers des situations réelles d''entreprise.', 2, false),
+  ('ef000000-0000-0000-0000-000000000003', 'f1000000-0000-0000-0000-000000000001', 'E3', 'Expliquer', 'Structurer et conceptualiser. Maîtriser les frameworks Scrum, Kanban et SAFe dans leur dimension managériale.', 3, false),
+  ('ef000000-0000-0000-0000-000000000004', 'f1000000-0000-0000-0000-000000000001', 'E4', 'Élaborer', 'Transférer vers sa pratique. Concevoir et présenter un plan de transformation Agile pour votre propre équipe.', 4, true),
+  ('ef000000-0000-0000-0000-000000000005', 'f1000000-0000-0000-0000-000000000001', 'E5', 'Évaluer', 'Valider et certifier. Démontrer la maîtrise des compétences agiles et obtenir la validation de la formation.', 5, true);
 
 -- ============================================================
 -- 17. PATH_ACTIVITIES  (from ParcoursView PHASES)
 -- ============================================================
 -- E1 activities
 INSERT INTO public.path_activities (id, phase_id, type, title, description, is_completed, sort_order) VALUES
-  ('pa000000-0000-0000-0000-000000000001', 'pp000000-0000-0000-0000-000000000001', 'situation', 'Mise en situation — Chef de projet sous pression',        'Scénario immersif : votre équipe ne livre pas, le client appelle. Comment réagissez-vous ?', true,  1),
-  ('pa000000-0000-0000-0000-000000000002', 'pp000000-0000-0000-0000-000000000001', 'video', 'Vidéo — Pourquoi l''Agilité transforme le management ?', 'Témoignages de managers ayant adopté les méthodes agiles. Format court, impactant.', true,  2),
-  ('pa000000-0000-0000-0000-000000000003', 'pp000000-0000-0000-0000-000000000001', 'quiz', 'Auto-diagnostic — Quel manager êtes-vous aujourd''hui ?', 'Questionnaire de positionnement initial (8 questions). Résultat personnel confidentiel.', true,  3);
+  ('ea000000-0000-0000-0000-000000000001', 'ef000000-0000-0000-0000-000000000001', 'situation', 'Mise en situation — Chef de projet sous pression',        'Scénario immersif : votre équipe ne livre pas, le client appelle. Comment réagissez-vous ?', true,  1),
+  ('ea000000-0000-0000-0000-000000000002', 'ef000000-0000-0000-0000-000000000001', 'video', 'Vidéo — Pourquoi l''Agilité transforme le management ?', 'Témoignages de managers ayant adopté les méthodes agiles. Format court, impactant.', true,  2),
+  ('ea000000-0000-0000-0000-000000000003', 'ef000000-0000-0000-0000-000000000001', 'quiz', 'Auto-diagnostic — Quel manager êtes-vous aujourd''hui ?', 'Questionnaire de positionnement initial (8 questions). Résultat personnel confidentiel.', true,  3);
 
 -- E2 activities
 INSERT INTO public.path_activities (id, phase_id, type, title, description, is_completed, sort_order) VALUES
-  ('pa000000-0000-0000-0000-000000000004', 'pp000000-0000-0000-0000-000000000002', 'cas', 'Cas pratique — 3 projets : lequel a réussi grâce à l''Agilité ?', 'Analyse de cas réels issus de la tech, du retail et des RH. Discussion guidée.', true,  1),
-  ('pa000000-0000-0000-0000-000000000005', 'pp000000-0000-0000-0000-000000000002', 'elearning', 'Découverte interactive — Le tableau Kanban en action', 'Simulation d''un Kanban board à compléter en autonomie, avec feedback instantané.', true,  2),
-  ('pa000000-0000-0000-0000-000000000006', 'pp000000-0000-0000-0000-000000000002', 'podcast', 'Podcast — Retour d''expérience DRH sur l''Agilité RH', 'Interview exclusive d''une DRH ayant mené la transformation agile de 400 personnes.', true,  3),
-  ('pa000000-0000-0000-0000-000000000007', 'pp000000-0000-0000-0000-000000000002', 'exercice',  'Exercice — Cartographier votre flux de travail actuel',            'Représentez vos tâches actuelles sur un Kanban simplifié. Première prise de recul.', true,  4);
+  ('ea000000-0000-0000-0000-000000000004', 'ef000000-0000-0000-0000-000000000002', 'cas', 'Cas pratique — 3 projets : lequel a réussi grâce à l''Agilité ?', 'Analyse de cas réels issus de la tech, du retail et des RH. Discussion guidée.', true,  1),
+  ('ea000000-0000-0000-0000-000000000005', 'ef000000-0000-0000-0000-000000000002', 'elearning', 'Découverte interactive — Le tableau Kanban en action', 'Simulation d''un Kanban board à compléter en autonomie, avec feedback instantané.', true,  2),
+  ('ea000000-0000-0000-0000-000000000006', 'ef000000-0000-0000-0000-000000000002', 'podcast', 'Podcast — Retour d''expérience DRH sur l''Agilité RH', 'Interview exclusive d''une DRH ayant mené la transformation agile de 400 personnes.', true,  3),
+  ('ea000000-0000-0000-0000-000000000007', 'ef000000-0000-0000-0000-000000000002', 'exercice',  'Exercice — Cartographier votre flux de travail actuel',            'Représentez vos tâches actuelles sur un Kanban simplifié. Première prise de recul.', true,  4);
 
 -- E3 activities
 INSERT INTO public.path_activities (id, phase_id, type, title, description, is_completed, sort_order) VALUES
-  ('pa000000-0000-0000-0000-000000000008',  'pp000000-0000-0000-0000-000000000003', 'module',    'Module — Les 4 valeurs et 12 principes du Manifeste Agile',       'Contenu structuré en 6 séquences avec schémas, exemples et points clés mémorisables.', false, 1),
-  ('pa000000-0000-0000-0000-000000000009',  'pp000000-0000-0000-0000-000000000003', 'video',     'Vidéo — Scrum en 15 min : rôles, cérémonies, artefacts',          'Animation pédagogique claire et mémorisable. Le meilleur résumé Scrum du marché.', false, 2),
-  ('pa000000-0000-0000-0000-000000000010', 'pp000000-0000-0000-0000-000000000003', 'module', 'Module — Le rôle du manager dans une équipe auto-organisée',       'Comment passer du contrôle à la facilitation. Outils pratiques pour lâcher prise.', false, 3),
-  ('pa000000-0000-0000-0000-000000000011', 'pp000000-0000-0000-0000-000000000003', 'exercice',  'Exercice — Remplir un backlog de sprint simulé',                   'Exercice guidé avec feedback automatique. Comprendre la priorisation par la valeur.', false, 4);
+  ('ea000000-0000-0000-0000-000000000008',  'ef000000-0000-0000-0000-000000000003', 'module',    'Module — Les 4 valeurs et 12 principes du Manifeste Agile',       'Contenu structuré en 6 séquences avec schémas, exemples et points clés mémorisables.', false, 1),
+  ('ea000000-0000-0000-0000-000000000009',  'ef000000-0000-0000-0000-000000000003', 'video',     'Vidéo — Scrum en 15 min : rôles, cérémonies, artefacts',          'Animation pédagogique claire et mémorisable. Le meilleur résumé Scrum du marché.', false, 2),
+  ('ea000000-0000-0000-0000-000000000010', 'ef000000-0000-0000-0000-000000000003', 'module', 'Module — Le rôle du manager dans une équipe auto-organisée',       'Comment passer du contrôle à la facilitation. Outils pratiques pour lâcher prise.', false, 3),
+  ('ea000000-0000-0000-0000-000000000011', 'ef000000-0000-0000-0000-000000000003', 'exercice',  'Exercice — Remplir un backlog de sprint simulé',                   'Exercice guidé avec feedback automatique. Comprendre la priorisation par la valeur.', false, 4);
 
 -- E4 activities
 INSERT INTO public.path_activities (id, phase_id, type, title, description, is_completed, sort_order) VALUES
-  ('pa000000-0000-0000-0000-000000000012', 'pp000000-0000-0000-0000-000000000004', 'projet', 'Projet — Plan de transformation Agile de votre équipe', 'Livrable individuel : diagnostic + plan d''action en 1 page. Critères fournis.', false, 1),
-  ('pa000000-0000-0000-0000-000000000013', 'pp000000-0000-0000-0000-000000000004', 'simulation', 'Simulation — Animer une rétro d''équipe difficile',                'Jeu de rôle avec personnages résistants. Pratiquer la facilitation sous pression.', false, 2),
-  ('pa000000-0000-0000-0000-000000000014', 'pp000000-0000-0000-0000-000000000004', 'exercice',  'Atelier — Prioriser un backlog conflictuel',                      'Exercice de prise de décision sous contraintes business et humaines.', false, 3);
+  ('ea000000-0000-0000-0000-000000000012', 'ef000000-0000-0000-0000-000000000004', 'projet', 'Projet — Plan de transformation Agile de votre équipe', 'Livrable individuel : diagnostic + plan d''action en 1 page. Critères fournis.', false, 1),
+  ('ea000000-0000-0000-0000-000000000013', 'ef000000-0000-0000-0000-000000000004', 'simulation', 'Simulation — Animer une rétro d''équipe difficile',                'Jeu de rôle avec personnages résistants. Pratiquer la facilitation sous pression.', false, 2),
+  ('ea000000-0000-0000-0000-000000000014', 'ef000000-0000-0000-0000-000000000004', 'exercice',  'Atelier — Prioriser un backlog conflictuel',                      'Exercice de prise de décision sous contraintes business et humaines.', false, 3);
 
 -- E5 activities
 INSERT INTO public.path_activities (id, phase_id, type, title, description, is_completed, sort_order) VALUES
-  ('pa000000-0000-0000-0000-000000000015', 'pp000000-0000-0000-0000-000000000005', 'quiz',       'Quiz final — 20 questions — Management Agile',                    'Couverture complète des 4 phases. Seuil de réussite : 75 %. 2 tentatives autorisées.', false, 1),
-  ('pa000000-0000-0000-0000-000000000016', 'pp000000-0000-0000-0000-000000000005', 'simulation', 'Cas de synthèse — Piloter une équipe en crise de sprint',         'Évaluation en conditions réelles. Grille partagée avant la session.', false, 2),
-  ('pa000000-0000-0000-0000-000000000017', 'pp000000-0000-0000-0000-000000000005', 'eval', 'Évaluation de la formation par l''apprenant',                      'Satisfaction, utilité perçue, recommandation — 5 min. Anonyme et confidentiel.', false, 3),
-  ('pa000000-0000-0000-0000-000000000018', 'pp000000-0000-0000-0000-000000000005', 'feedback',   'Retour personnalisé formateur sur le livrable E4',                'Commentaires individuels écrits + recommandations pour la suite du parcours.', false, 4);
+  ('ea000000-0000-0000-0000-000000000015', 'ef000000-0000-0000-0000-000000000005', 'quiz',       'Quiz final — 20 questions — Management Agile',                    'Couverture complète des 4 phases. Seuil de réussite : 75 %. 2 tentatives autorisées.', false, 1),
+  ('ea000000-0000-0000-0000-000000000016', 'ef000000-0000-0000-0000-000000000005', 'simulation', 'Cas de synthèse — Piloter une équipe en crise de sprint',         'Évaluation en conditions réelles. Grille partagée avant la session.', false, 2),
+  ('ea000000-0000-0000-0000-000000000017', 'ef000000-0000-0000-0000-000000000005', 'eval', 'Évaluation de la formation par l''apprenant',                      'Satisfaction, utilité perçue, recommandation — 5 min. Anonyme et confidentiel.', false, 3),
+  ('ea000000-0000-0000-0000-000000000018', 'ef000000-0000-0000-0000-000000000005', 'feedback',   'Retour personnalisé formateur sur le livrable E4',                'Commentaires individuels écrits + recommandations pour la suite du parcours.', false, 4);
 
 -- Re-enable RLS
 SET session_replication_role = 'origin';
