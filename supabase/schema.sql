@@ -1,13 +1,16 @@
 -- ============================================================
--- SkillPath LMS — Complete Supabase Schema
+-- SkillPath LMS — Complete Supabase Schema (dependency-safe)
+-- Phase 1: Extensions + Helper functions
+-- Phase 2: All tables (no RLS policies)
+-- Phase 3: All RLS policies + indexes
 -- ============================================================
 
--- Extensions
+-- ═══════════════════════════════════════════════════════════
+-- PHASE 1: Extensions + Helper functions
+-- ═══════════════════════════════════════════════════════════
+
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
--- ============================================================
--- Helper: updated_at trigger
--- ============================================================
 CREATE OR REPLACE FUNCTION public.set_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -16,9 +19,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- ============================================================
--- Helper: handle_new_user trigger
--- ============================================================
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -33,659 +33,455 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- ============================================================
--- 1. profiles — extends auth.users
--- ============================================================
-CREATE TABLE public.profiles (
-  id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
-  name        TEXT NOT NULL,
-  role        TEXT NOT NULL CHECK (role IN ('apprenant', 'formateur', 'rh')),
-  avatar_color TEXT DEFAULT CONCAT('#', substr(md5(random()::text), 1, 6)),
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+-- ═══════════════════════════════════════════════════════════
+-- PHASE 2: All tables (no RLS policies yet)
+-- ═══════════════════════════════════════════════════════════
 
+-- 1. profiles
+CREATE TABLE public.profiles (
+  id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  role TEXT NOT NULL CHECK (role IN ('apprenant', 'formateur', 'rh')),
+  avatar_color TEXT DEFAULT CONCAT('#', substr(md5(random()::text), 1, 6)),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "profiles_read_own"
-  ON public.profiles FOR SELECT
-  USING (auth.uid() = id);
+-- 2. companies
+CREATE TABLE public.companies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name TEXT NOT NULL,
+  sector TEXT,
+  employees INT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "profiles_update_own"
-  ON public.profiles FOR UPDATE
-  USING (auth.uid() = id);
+-- 3. courses
+CREATE TABLE public.courses (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  category TEXT NOT NULL CHECK (category IN ('Management', 'Communication', 'Data & Analyse', 'Cybersécurité')),
+  level TEXT NOT NULL CHECK (level IN ('deb', 'int', 'avd', 'exp')),
+  duration TEXT NOT NULL,
+  description TEXT,
+  icon_key TEXT,
+  rating NUMERIC(3,2) DEFAULT 0 CHECK (rating >= 0 AND rating <= 5),
+  learners_count INT DEFAULT 0,
+  is_new BOOLEAN DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "profiles_formateur_read_learners"
-  ON public.profiles FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.enrollments e
-      JOIN public.formations f ON f.id = e.formation_id
-      JOIN public.sessions s ON s.formation_id = f.id
-      WHERE s.facilitator_id = auth.uid()
-        AND e.profile_id = profiles.id
-    )
-  );
+-- 4. formations
+CREATE TABLE public.formations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  company_id UUID REFERENCES public.companies(id) ON DELETE SET NULL,
+  status TEXT NOT NULL CHECK (status IN ('active', 'completed', 'planned')),
+  progress INT DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
+  learners_count INT DEFAULT 0,
+  start_date DATE,
+  end_date DATE,
+  budget NUMERIC,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.formations ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY "profiles_rh_read_all"
-  ON public.profiles FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh'
-    )
-  );
+-- 5. sessions
+CREATE TABLE public.sessions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  formation_id UUID NOT NULL REFERENCES public.formations(id) ON DELETE CASCADE,
+  title TEXT NOT NULL,
+  date DATE NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  location TEXT,
+  facilitator_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  status TEXT NOT NULL CHECK (status IN ('planned', 'confirmed', 'completed', 'cancelled')),
+  max_participants INT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
+
+-- 6. enrollments
+CREATE TABLE public.enrollments (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  course_id UUID REFERENCES public.courses(id) ON DELETE CASCADE,
+  formation_id UUID REFERENCES public.formations(id) ON DELETE CASCADE,
+  status TEXT NOT NULL CHECK (status IN ('enrolled', 'in_progress', 'completed', 'dropped')),
+  progress INT DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
+  enrolled_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at TIMESTAMPTZ,
+  UNIQUE (profile_id, course_id, formation_id)
+);
+ALTER TABLE public.enrollments ENABLE ROW LEVEL SECURITY;
+
+-- 7. competencies
+CREATE TABLE public.competencies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  slug TEXT NOT NULL UNIQUE CHECK (slug IN ('lead','comm','data','agil','nego','cyber','innov','mgmt','digit','mktg')),
+  name TEXT NOT NULL,
+  icon_key TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.competencies ENABLE ROW LEVEL SECURITY;
+
+-- 8. competency_scores
+CREATE TABLE public.competency_scores (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  competency_id UUID NOT NULL REFERENCES public.competencies(id) ON DELETE CASCADE,
+  score INT NOT NULL DEFAULT 0 CHECK (score >= 0 AND score <= 100),
+  status TEXT NOT NULL CHECK (status IN ('mastered', 'progress', 'weak', 'locked')),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (profile_id, competency_id)
+);
+ALTER TABLE public.competency_scores ENABLE ROW LEVEL SECURITY;
+
+-- 9. resources
+CREATE TABLE public.resources (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  competency_id UUID NOT NULL REFERENCES public.competencies(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('module', 'elearning', 'video', 'podcast', 'exercice', 'quiz', 'situation')),
+  title TEXT NOT NULL,
+  level TEXT NOT NULL CHECK (level IN ('deb', 'int', 'avd', 'exp')),
+  duration TEXT,
+  rating NUMERIC(3,2) DEFAULT 0 CHECK (rating >= 0 AND rating <= 5),
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.resources ENABLE ROW LEVEL SECURITY;
+
+-- 10. development_plan_resources
+CREATE TABLE public.development_plan_resources (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  resource_id UUID NOT NULL REFERENCES public.resources(id) ON DELETE CASCADE,
+  competency_id UUID NOT NULL REFERENCES public.competencies(id) ON DELETE CASCADE,
+  assigned_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (profile_id, resource_id)
+);
+ALTER TABLE public.development_plan_resources ENABLE ROW LEVEL SECURITY;
+
+-- 11. quizzes
+CREATE TABLE public.quizzes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  formation_id UUID REFERENCES public.formations(id) ON DELETE SET NULL,
+  phase TEXT,
+  level TEXT NOT NULL CHECK (level IN ('deb', 'int', 'avd')),
+  threshold INT NOT NULL DEFAULT 50,
+  chrono INT,
+  attempts_allowed INT DEFAULT 1,
+  tag TEXT NOT NULL DEFAULT '' CHECK (tag IN ('obligatoire', 'new', '')),
+  created_by UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.quizzes ENABLE ROW LEVEL SECURITY;
+
+-- 12. quiz_questions
+CREATE TABLE public.quiz_questions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  quiz_id UUID NOT NULL REFERENCES public.quizzes(id) ON DELETE CASCADE,
+  type TEXT NOT NULL CHECK (type IN ('qcm', 'qcmm', 'vf', 'order', 'situation', 'open')),
+  question_text TEXT NOT NULL,
+  options JSONB,
+  correct_answer JSONB,
+  points INT NOT NULL DEFAULT 1,
+  explanation TEXT,
+  sort_order INT NOT NULL DEFAULT 0
+);
+ALTER TABLE public.quiz_questions ENABLE ROW LEVEL SECURITY;
+
+-- 13. quiz_attempts
+CREATE TABLE public.quiz_attempts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  quiz_id UUID NOT NULL REFERENCES public.quizzes(id) ON DELETE CASCADE,
+  score INT NOT NULL DEFAULT 0,
+  total_points INT NOT NULL DEFAULT 0,
+  percentage INT NOT NULL DEFAULT 0,
+  passed BOOLEAN NOT NULL DEFAULT false,
+  time_spent TEXT,
+  answers JSONB,
+  attempted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.quiz_attempts ENABLE ROW LEVEL SECURITY;
+
+-- 14. messages
+CREATE TABLE public.messages (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  sender_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  recipient_id UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
+  thread_id UUID,
+  subject TEXT,
+  body TEXT NOT NULL,
+  is_read BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
+
+-- 15. badges
+CREATE TABLE public.badges (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  profile_id UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  label TEXT NOT NULL,
+  earned_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.badges ENABLE ROW LEVEL SECURITY;
+
+-- 16. path_phases
+CREATE TABLE public.path_phases (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  formation_id UUID NOT NULL REFERENCES public.formations(id) ON DELETE CASCADE,
+  phase TEXT NOT NULL CHECK (phase IN ('E1', 'E2', 'E3', 'E4', 'E5')),
+  title TEXT NOT NULL,
+  description TEXT,
+  sort_order INT NOT NULL DEFAULT 0,
+  is_locked BOOLEAN NOT NULL DEFAULT true,
+  UNIQUE (formation_id, phase)
+);
+ALTER TABLE public.path_phases ENABLE ROW LEVEL SECURITY;
+
+-- 17. path_activities
+CREATE TABLE public.path_activities (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  phase_id UUID NOT NULL REFERENCES public.path_phases(id) ON DELETE CASCADE,
+  type TEXT NOT NULL,
+  title TEXT NOT NULL,
+  description TEXT,
+  is_completed BOOLEAN NOT NULL DEFAULT false,
+  sort_order INT NOT NULL DEFAULT 0
+);
+ALTER TABLE public.path_activities ENABLE ROW LEVEL SECURITY;
 
 -- Trigger: auto-create profile on signup
 CREATE OR REPLACE TRIGGER on_auth_user_created
-  AFTER INSERT ON auth.users
-  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+AFTER INSERT ON auth.users
+FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 
--- ============================================================
--- 4. companies — client companies (before formations)
--- ============================================================
-CREATE TABLE public.companies (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name        TEXT NOT NULL,
-  sector      TEXT,
-  employees   INT,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.companies ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "companies_read_all"
-  ON public.companies FOR SELECT
-  USING (true);
-
-CREATE POLICY "companies_rh_all"
-  ON public.companies FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh'
-    )
-  );
-
--- ============================================================
--- 2. courses — 18 courses in catalogue
--- ============================================================
-CREATE TABLE public.courses (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title         TEXT NOT NULL,
-  category      TEXT NOT NULL CHECK (category IN ('Management', 'Communication', 'Data & Analyse', 'Cybersécurité')),
-  level         TEXT NOT NULL CHECK (level IN ('deb', 'int', 'avd', 'exp')),
-  duration      TEXT NOT NULL,
-  description   TEXT,
-  icon_key      TEXT,
-  rating        NUMERIC(3,2) DEFAULT 0 CHECK (rating >= 0 AND rating <= 5),
-  learners_count INT DEFAULT 0,
-  is_new        BOOLEAN DEFAULT false,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.courses ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "courses_read_all"
-  ON public.courses FOR SELECT
-  USING (true);
-
-CREATE POLICY "courses_rh_all"
-  ON public.courses FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh'
-    )
-  );
-
-CREATE POLICY "courses_formateur_all"
-  ON public.courses FOR ALL
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur'
-    )
-  );
-
--- ============================================================
--- 3. formations — 8 training programs
--- ============================================================
-CREATE TABLE public.formations (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title         TEXT NOT NULL,
-  company_id    UUID REFERENCES public.companies(id) ON DELETE SET NULL,
-  status        TEXT NOT NULL CHECK (status IN ('active', 'completed', 'planned')),
-  progress      INT DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
-  learners_count INT DEFAULT 0,
-  start_date    DATE,
-  end_date      DATE,
-  budget        NUMERIC,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.formations ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "formations_read_own_or_all"
-  ON public.formations FOR SELECT
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
-    OR EXISTS (
-      SELECT 1 FROM public.enrollments e
-      WHERE e.formation_id = formations.id AND e.profile_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "formations_rh_all"
-  ON public.formations FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
-CREATE POLICY "formations_formateur_all"
-  ON public.formations FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
-  );
-
--- ============================================================
--- 5. sessions — training sessions/events
--- ============================================================
-CREATE TABLE public.sessions (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  formation_id    UUID NOT NULL REFERENCES public.formations(id) ON DELETE CASCADE,
-  title           TEXT NOT NULL,
-  date            DATE NOT NULL,
-  start_time      TIME NOT NULL,
-  end_time        TIME NOT NULL,
-  location        TEXT,
-  facilitator_id  UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  status          TEXT NOT NULL CHECK (status IN ('planned', 'confirmed', 'completed', 'cancelled')),
-  max_participants INT,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "sessions_read_formation_member"
-  ON public.sessions FOR SELECT
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
-    OR EXISTS (
-      SELECT 1 FROM public.enrollments e
-      WHERE e.formation_id = sessions.formation_id AND e.profile_id = auth.uid()
-    )
-    OR sessions.facilitator_id = auth.uid()
-  );
-
-CREATE POLICY "sessions_rh_all"
-  ON public.sessions FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
-CREATE POLICY "sessions_formateur_all"
-  ON public.sessions FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
-  );
-
--- ============================================================
--- 6. enrollments — links profiles to formations/courses
--- ============================================================
-CREATE TABLE public.enrollments (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  profile_id    UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  course_id     UUID REFERENCES public.courses(id) ON DELETE CASCADE,
-  formation_id  UUID REFERENCES public.formations(id) ON DELETE CASCADE,
-  status        TEXT NOT NULL CHECK (status IN ('enrolled', 'in_progress', 'completed', 'dropped')),
-  progress      INT DEFAULT 0 CHECK (progress >= 0 AND progress <= 100),
-  enrolled_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  completed_at  TIMESTAMPTZ,
-  UNIQUE (profile_id, course_id, formation_id)
-);
-
-ALTER TABLE public.enrollments ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "enrollments_read_own"
-  ON public.enrollments FOR SELECT
-  USING (
-    profile_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
-  );
-
-CREATE POLICY "enrollments_insert_own"
-  ON public.enrollments FOR INSERT
-  WITH CHECK (profile_id = auth.uid());
-
-CREATE POLICY "enrollments_update_own"
-  ON public.enrollments FOR UPDATE
-  USING (profile_id = auth.uid());
-
-CREATE POLICY "enrollments_rh_all"
-  ON public.enrollments FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
-CREATE POLICY "enrollments_formateur_all"
-  ON public.enrollments FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
-  );
-
--- ============================================================
--- 7. competencies — 10 competency domains
--- ============================================================
-CREATE TABLE public.competencies (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  slug        TEXT NOT NULL UNIQUE CHECK (slug IN ('lead','comm','data','agil','nego','cyber','innov','mgmt','digit','mktg')),
-  name        TEXT NOT NULL,
-  icon_key    TEXT,
-  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.competencies ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "competencies_read_all"
-  ON public.competencies FOR SELECT
-  USING (true);
-
-CREATE POLICY "competencies_rh_all"
-  ON public.competencies FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
--- ============================================================
--- 8. competency_scores — per-user per-competency scores
--- ============================================================
-CREATE TABLE public.competency_scores (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  profile_id    UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  competency_id UUID NOT NULL REFERENCES public.competencies(id) ON DELETE CASCADE,
-  score         INT NOT NULL DEFAULT 0 CHECK (score >= 0 AND score <= 100),
-  status        TEXT NOT NULL CHECK (status IN ('mastered', 'progress', 'weak', 'locked')),
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (profile_id, competency_id)
-);
-
-ALTER TABLE public.competency_scores ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "competency_scores_read_own"
-  ON public.competency_scores FOR SELECT
-  USING (
-    profile_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
-  );
-
-CREATE POLICY "competency_scores_insert_own"
-  ON public.competency_scores FOR INSERT
-  WITH CHECK (profile_id = auth.uid());
-
-CREATE POLICY "competency_scores_update_own"
-  ON public.competency_scores FOR UPDATE
-  USING (profile_id = auth.uid());
-
-CREATE POLICY "competency_scores_rh_all"
-  ON public.competency_scores FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
--- updated_at trigger
+-- Trigger: competency_scores updated_at
 CREATE TRIGGER competency_scores_updated_at
-  BEFORE UPDATE ON public.competency_scores
-  FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+BEFORE UPDATE ON public.competency_scores
+FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
--- ============================================================
--- 9. resources — 27 learning resources
--- ============================================================
-CREATE TABLE public.resources (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  competency_id UUID NOT NULL REFERENCES public.competencies(id) ON DELETE CASCADE,
-  type          TEXT NOT NULL CHECK (type IN ('module', 'elearning', 'video', 'podcast', 'exercice', 'quiz', 'situation')),
-  title         TEXT NOT NULL,
-  level         TEXT NOT NULL CHECK (level IN ('deb', 'int', 'avd', 'exp')),
-  duration      TEXT,
-  rating        NUMERIC(3,2) DEFAULT 0 CHECK (rating >= 0 AND rating <= 5),
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+-- ═══════════════════════════════════════════════════════════
+-- PHASE 3: All RLS policies + indexes
+-- ═══════════════════════════════════════════════════════════
+
+-- ── profiles ──
+CREATE POLICY "profiles_read_own" ON public.profiles FOR SELECT USING (auth.uid() = id);
+CREATE POLICY "profiles_update_own" ON public.profiles FOR UPDATE USING (auth.uid() = id);
+CREATE POLICY "profiles_formateur_read_learners" ON public.profiles FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM public.enrollments e
+    JOIN public.formations f ON f.id = e.formation_id
+    JOIN public.sessions s ON s.formation_id = f.id
+    WHERE s.facilitator_id = auth.uid() AND e.profile_id = profiles.id
+  )
+);
+CREATE POLICY "profiles_rh_read_all" ON public.profiles FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
 );
 
-ALTER TABLE public.resources ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "resources_read_all"
-  ON public.resources FOR SELECT
-  USING (true);
-
-CREATE POLICY "resources_rh_all"
-  ON public.resources FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
-CREATE POLICY "resources_formateur_all"
-  ON public.resources FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
-  );
-
--- ============================================================
--- 10. development_plan_resources — assigned resources in dev plan
--- ============================================================
-CREATE TABLE public.development_plan_resources (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  profile_id    UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  resource_id   UUID NOT NULL REFERENCES public.resources(id) ON DELETE CASCADE,
-  competency_id UUID NOT NULL REFERENCES public.competencies(id) ON DELETE CASCADE,
-  assigned_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
-  UNIQUE (profile_id, resource_id)
+-- ── companies ──
+CREATE POLICY "companies_read_all" ON public.companies FOR SELECT USING (true);
+CREATE POLICY "companies_rh_all" ON public.companies FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
 );
 
-ALTER TABLE public.development_plan_resources ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "dev_plan_read_own"
-  ON public.development_plan_resources FOR SELECT
-  USING (
-    profile_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
-  );
-
-CREATE POLICY "dev_plan_insert_own"
-  ON public.development_plan_resources FOR INSERT
-  WITH CHECK (profile_id = auth.uid());
-
-CREATE POLICY "dev_plan_delete_own"
-  ON public.development_plan_resources FOR DELETE
-  USING (profile_id = auth.uid());
-
-CREATE POLICY "dev_plan_rh_all"
-  ON public.development_plan_resources FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
-CREATE POLICY "dev_plan_formateur_all"
-  ON public.development_plan_resources FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
-  );
-
--- ============================================================
--- 11. quizzes — 3 quizzes
--- ============================================================
-CREATE TABLE public.quizzes (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  title           TEXT NOT NULL,
-  formation_id    UUID REFERENCES public.formations(id) ON DELETE SET NULL,
-  phase           TEXT,
-  level           TEXT NOT NULL CHECK (level IN ('deb', 'int', 'avd')),
-  threshold       INT NOT NULL DEFAULT 50,
-  chrono          INT,
-  attempts_allowed INT DEFAULT 1,
-  tag             TEXT NOT NULL DEFAULT '' CHECK (tag IN ('obligatoire', 'new', '')),
-  created_by      UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+-- ── courses ──
+CREATE POLICY "courses_read_all" ON public.courses FOR SELECT USING (true);
+CREATE POLICY "courses_rh_all" ON public.courses FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+CREATE POLICY "courses_formateur_all" ON public.courses FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
 );
 
-ALTER TABLE public.quizzes ENABLE ROW LEVEL SECURITY;
+-- ── formations ──
+CREATE POLICY "formations_read_own_or_all" ON public.formations FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
+  OR EXISTS (SELECT 1 FROM public.enrollments e WHERE e.formation_id = formations.id AND e.profile_id = auth.uid())
+);
+CREATE POLICY "formations_rh_all" ON public.formations FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+CREATE POLICY "formations_formateur_all" ON public.formations FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
+);
 
-CREATE POLICY "quizzes_read_formation_member"
-  ON public.quizzes FOR SELECT
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
-    OR EXISTS (
-      SELECT 1 FROM public.enrollments e
-      WHERE e.formation_id = quizzes.formation_id AND e.profile_id = auth.uid()
+-- ── sessions ──
+CREATE POLICY "sessions_read_formation_member" ON public.sessions FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
+  OR EXISTS (SELECT 1 FROM public.enrollments e WHERE e.formation_id = sessions.formation_id AND e.profile_id = auth.uid())
+  OR sessions.facilitator_id = auth.uid()
+);
+CREATE POLICY "sessions_rh_all" ON public.sessions FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+CREATE POLICY "sessions_formateur_all" ON public.sessions FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
+);
+
+-- ── enrollments ──
+CREATE POLICY "enrollments_read_own" ON public.enrollments FOR SELECT USING (
+  profile_id = auth.uid()
+  OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
+);
+CREATE POLICY "enrollments_insert_own" ON public.enrollments FOR INSERT WITH CHECK (profile_id = auth.uid());
+CREATE POLICY "enrollments_update_own" ON public.enrollments FOR UPDATE USING (profile_id = auth.uid());
+CREATE POLICY "enrollments_rh_all" ON public.enrollments FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+CREATE POLICY "enrollments_formateur_all" ON public.enrollments FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
+);
+
+-- ── competencies ──
+CREATE POLICY "competencies_read_all" ON public.competencies FOR SELECT USING (true);
+CREATE POLICY "competencies_rh_all" ON public.competencies FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+
+-- ── competency_scores ──
+CREATE POLICY "competency_scores_read_own" ON public.competency_scores FOR SELECT USING (
+  profile_id = auth.uid()
+  OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
+);
+CREATE POLICY "competency_scores_insert_own" ON public.competency_scores FOR INSERT WITH CHECK (profile_id = auth.uid());
+CREATE POLICY "competency_scores_update_own" ON public.competency_scores FOR UPDATE USING (profile_id = auth.uid());
+CREATE POLICY "competency_scores_rh_all" ON public.competency_scores FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+
+-- ── resources ──
+CREATE POLICY "resources_read_all" ON public.resources FOR SELECT USING (true);
+CREATE POLICY "resources_rh_all" ON public.resources FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+CREATE POLICY "resources_formateur_all" ON public.resources FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
+);
+
+-- ── development_plan_resources ──
+CREATE POLICY "dev_plan_read_own" ON public.development_plan_resources FOR SELECT USING (
+  profile_id = auth.uid()
+  OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
+);
+CREATE POLICY "dev_plan_insert_own" ON public.development_plan_resources FOR INSERT WITH CHECK (profile_id = auth.uid());
+CREATE POLICY "dev_plan_delete_own" ON public.development_plan_resources FOR DELETE USING (profile_id = auth.uid());
+CREATE POLICY "dev_plan_rh_all" ON public.development_plan_resources FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+CREATE POLICY "dev_plan_formateur_all" ON public.development_plan_resources FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
+);
+
+-- ── quizzes ──
+CREATE POLICY "quizzes_read_formation_member" ON public.quizzes FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
+  OR EXISTS (SELECT 1 FROM public.enrollments e WHERE e.formation_id = quizzes.formation_id AND e.profile_id = auth.uid())
+  OR quizzes.created_by = auth.uid()
+);
+CREATE POLICY "quizzes_rh_all" ON public.quizzes FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+CREATE POLICY "quizzes_formateur_all" ON public.quizzes FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
+);
+
+-- ── quiz_questions ──
+CREATE POLICY "quiz_questions_read_via_quiz" ON public.quiz_questions FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM public.quizzes q
+    WHERE q.id = quiz_questions.quiz_id
+    AND (
+      EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
+      OR EXISTS (SELECT 1 FROM public.enrollments e WHERE e.formation_id = q.formation_id AND e.profile_id = auth.uid())
+      OR q.created_by = auth.uid()
     )
-    OR quizzes.created_by = auth.uid()
-  );
-
-CREATE POLICY "quizzes_rh_all"
-  ON public.quizzes FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
-CREATE POLICY "quizzes_formateur_all"
-  ON public.quizzes FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
-  );
-
--- ============================================================
--- 12. quiz_questions — questions within quizzes
--- ============================================================
-CREATE TABLE public.quiz_questions (
-  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  quiz_id         UUID NOT NULL REFERENCES public.quizzes(id) ON DELETE CASCADE,
-  type            TEXT NOT NULL CHECK (type IN ('qcm', 'qcmm', 'vf', 'order', 'situation', 'open')),
-  question_text   TEXT NOT NULL,
-  options         JSONB,
-  correct_answer  JSONB,
-  points          INT NOT NULL DEFAULT 1,
-  explanation     TEXT,
-  sort_order      INT NOT NULL DEFAULT 0
+  )
+);
+CREATE POLICY "quiz_questions_rh_all" ON public.quiz_questions FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+CREATE POLICY "quiz_questions_formateur_all" ON public.quiz_questions FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
 );
 
-ALTER TABLE public.quiz_questions ENABLE ROW LEVEL SECURITY;
+-- ── quiz_attempts ──
+CREATE POLICY "quiz_attempts_read_own" ON public.quiz_attempts FOR SELECT USING (
+  profile_id = auth.uid()
+  OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
+);
+CREATE POLICY "quiz_attempts_insert_own" ON public.quiz_attempts FOR INSERT WITH CHECK (profile_id = auth.uid());
+CREATE POLICY "quiz_attempts_rh_all" ON public.quiz_attempts FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+CREATE POLICY "quiz_attempts_formateur_read" ON public.quiz_attempts FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
+);
 
-CREATE POLICY "quiz_questions_read_via_quiz"
-  ON public.quiz_questions FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.quizzes q
-      WHERE q.id = quiz_questions.quiz_id
-        AND (
-          EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
-          OR EXISTS (
-            SELECT 1 FROM public.enrollments e
-            WHERE e.formation_id = q.formation_id AND e.profile_id = auth.uid()
-          )
-          OR q.created_by = auth.uid()
-        )
+-- ── messages ──
+CREATE POLICY "messages_read_own" ON public.messages FOR SELECT USING (
+  sender_id = auth.uid() OR recipient_id = auth.uid()
+  OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+CREATE POLICY "messages_insert_own" ON public.messages FOR INSERT WITH CHECK (sender_id = auth.uid());
+CREATE POLICY "messages_update_own" ON public.messages FOR UPDATE USING (recipient_id = auth.uid());
+CREATE POLICY "messages_delete_own" ON public.messages FOR DELETE USING (
+  sender_id = auth.uid() OR recipient_id = auth.uid()
+);
+
+-- ── badges ──
+CREATE POLICY "badges_read_own" ON public.badges FOR SELECT USING (
+  profile_id = auth.uid()
+  OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
+);
+CREATE POLICY "badges_insert_rh" ON public.badges FOR INSERT WITH CHECK (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+CREATE POLICY "badges_rh_all" ON public.badges FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+
+-- ── path_phases ──
+CREATE POLICY "path_phases_read_formation_member" ON public.path_phases FOR SELECT USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
+  OR EXISTS (SELECT 1 FROM public.enrollments e WHERE e.formation_id = path_phases.formation_id AND e.profile_id = auth.uid())
+);
+CREATE POLICY "path_phases_rh_all" ON public.path_phases FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+CREATE POLICY "path_phases_formateur_all" ON public.path_phases FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
+);
+
+-- ── path_activities ──
+CREATE POLICY "path_activities_read_via_phase" ON public.path_activities FOR SELECT USING (
+  EXISTS (
+    SELECT 1 FROM public.path_phases pp
+    WHERE pp.id = path_activities.phase_id
+    AND (
+      EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
+      OR EXISTS (SELECT 1 FROM public.enrollments e WHERE e.formation_id = pp.formation_id AND e.profile_id = auth.uid())
     )
-  );
-
-CREATE POLICY "quiz_questions_rh_all"
-  ON public.quiz_questions FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
-CREATE POLICY "quiz_questions_formateur_all"
-  ON public.quiz_questions FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
-  );
-
--- ============================================================
--- 13. quiz_attempts — user attempts at quizzes
--- ============================================================
-CREATE TABLE public.quiz_attempts (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  profile_id    UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  quiz_id       UUID NOT NULL REFERENCES public.quizzes(id) ON DELETE CASCADE,
-  score         INT NOT NULL DEFAULT 0,
-  total_points  INT NOT NULL DEFAULT 0,
-  percentage    INT NOT NULL DEFAULT 0,
-  passed        BOOLEAN NOT NULL DEFAULT false,
-  time_spent    TEXT,
-  answers       JSONB,
-  attempted_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+  )
+);
+CREATE POLICY "path_activities_rh_all" ON public.path_activities FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
+);
+CREATE POLICY "path_activities_formateur_all" ON public.path_activities FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
 );
 
-ALTER TABLE public.quiz_attempts ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "quiz_attempts_read_own"
-  ON public.quiz_attempts FOR SELECT
-  USING (
-    profile_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
-  );
-
-CREATE POLICY "quiz_attempts_insert_own"
-  ON public.quiz_attempts FOR INSERT
-  WITH CHECK (profile_id = auth.uid());
-
-CREATE POLICY "quiz_attempts_rh_all"
-  ON public.quiz_attempts FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
-CREATE POLICY "quiz_attempts_formateur_read"
-  ON public.quiz_attempts FOR SELECT
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
-  );
-
--- ============================================================
--- 14. messages — messaging system
--- ============================================================
-CREATE TABLE public.messages (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  sender_id     UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  recipient_id  UUID REFERENCES public.profiles(id) ON DELETE CASCADE,
-  thread_id     UUID,
-  subject       TEXT,
-  body          TEXT NOT NULL,
-  is_read       BOOLEAN NOT NULL DEFAULT false,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "messages_read_own"
-  ON public.messages FOR SELECT
-  USING (
-    sender_id = auth.uid() OR recipient_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
-CREATE POLICY "messages_insert_own"
-  ON public.messages FOR INSERT
-  WITH CHECK (sender_id = auth.uid());
-
-CREATE POLICY "messages_update_own"
-  ON public.messages FOR UPDATE
-  USING (recipient_id = auth.uid());
-
-CREATE POLICY "messages_delete_own"
-  ON public.messages FOR DELETE
-  USING (sender_id = auth.uid() OR recipient_id = auth.uid());
-
--- ============================================================
--- 15. badges — gamification badges
--- ============================================================
-CREATE TABLE public.badges (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  profile_id  UUID NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-  type        TEXT NOT NULL,
-  label       TEXT NOT NULL,
-  earned_at   TIMESTAMPTZ NOT NULL DEFAULT now()
-);
-
-ALTER TABLE public.badges ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "badges_read_own"
-  ON public.badges FOR SELECT
-  USING (
-    profile_id = auth.uid()
-    OR EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
-  );
-
-CREATE POLICY "badges_insert_rh"
-  ON public.badges FOR INSERT
-  WITH CHECK (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
-CREATE POLICY "badges_rh_all"
-  ON public.badges FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
--- ============================================================
--- 16. path_phases — 5E pedagogical phases for a formation
--- ============================================================
-CREATE TABLE public.path_phases (
-  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  formation_id UUID NOT NULL REFERENCES public.formations(id) ON DELETE CASCADE,
-  phase       TEXT NOT NULL CHECK (phase IN ('E1', 'E2', 'E3', 'E4', 'E5')),
-  title       TEXT NOT NULL,
-  description TEXT,
-  sort_order  INT NOT NULL DEFAULT 0,
-  is_locked   BOOLEAN NOT NULL DEFAULT true,
-  UNIQUE (formation_id, phase)
-);
-
-ALTER TABLE public.path_phases ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "path_phases_read_formation_member"
-  ON public.path_phases FOR SELECT
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
-    OR EXISTS (
-      SELECT 1 FROM public.enrollments e
-      WHERE e.formation_id = path_phases.formation_id AND e.profile_id = auth.uid()
-    )
-  );
-
-CREATE POLICY "path_phases_rh_all"
-  ON public.path_phases FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
-CREATE POLICY "path_phases_formateur_all"
-  ON public.path_phases FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
-  );
-
--- ============================================================
--- 17. path_activities — activities within phases
--- ============================================================
-CREATE TABLE public.path_activities (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  phase_id      UUID NOT NULL REFERENCES public.path_phases(id) ON DELETE CASCADE,
-  type          TEXT NOT NULL,
-  title         TEXT NOT NULL,
-  description   TEXT,
-  is_completed  BOOLEAN NOT NULL DEFAULT false,
-  sort_order    INT NOT NULL DEFAULT 0
-);
-
-ALTER TABLE public.path_activities ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "path_activities_read_via_phase"
-  ON public.path_activities FOR SELECT
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.path_phases pp
-      WHERE pp.id = path_activities.phase_id
-        AND (
-          EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role IN ('rh', 'formateur'))
-          OR EXISTS (
-            SELECT 1 FROM public.enrollments e
-            WHERE e.formation_id = pp.formation_id AND e.profile_id = auth.uid()
-          )
-        )
-    )
-  );
-
-CREATE POLICY "path_activities_rh_all"
-  ON public.path_activities FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'rh')
-  );
-
-CREATE POLICY "path_activities_formateur_all"
-  ON public.path_activities FOR ALL
-  USING (
-    EXISTS (SELECT 1 FROM public.profiles p WHERE p.id = auth.uid() AND p.role = 'formateur')
-  );
-
--- ============================================================
+-- ═══════════════════════════════════════════════════════════
 -- Indexes for performance
--- ============================================================
+-- ═══════════════════════════════════════════════════════════
+
 CREATE INDEX idx_profiles_role ON public.profiles(role);
 CREATE INDEX idx_courses_category ON public.courses(category);
 CREATE INDEX idx_courses_level ON public.courses(level);
