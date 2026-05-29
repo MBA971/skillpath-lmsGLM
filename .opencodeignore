@@ -1,0 +1,14 @@
+node_modules/
+.next/
+dist/
+*.log
+playwright-report/
+test-results/
+.git/
+.vercel/
+*.zip
+*.webm
+*.png
+*.jpg
+package-lock.json
+.next/cache/

@@ -1,0 +1,1 @@
+{`n  \"model\": \"glm-4\",`n  \"stream\": true,`n  \"max_tokens\": 4096,`n  \"temperature\": 0.1,`n  \"context_window\": 8192`n}
